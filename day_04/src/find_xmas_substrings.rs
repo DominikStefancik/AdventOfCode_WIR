@@ -128,7 +128,7 @@ fn find_diagonal_right_to_left(
 ///
 /// Returns:
 /// A Result containing number of substrings found in the diagonal direction from right to left
-pub fn get_all_xmas(text: &str) -> Result<Xmas, AdventOfCodeError> {
+pub fn find_all_xmas_substrings(text: &str) -> Result<Xmas, AdventOfCodeError> {
     // Horizontal search
     let horizontal_left_to_right_search_count = find_horizontal(&text, r"XMAS")?;
     let horizontal_right_to_left_search_count = find_horizontal(&text, r"SAMX")?;
@@ -171,10 +171,10 @@ pub fn get_all_xmas(text: &str) -> Result<Xmas, AdventOfCodeError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::find_all_xmas::get_all_xmas;
+    use crate::find_xmas_substrings::find_all_xmas_substrings;
 
     #[test]
-    fn it_works() {
+    fn finds_all_xmas_substrings() {
         let input = "\
 MMMSXXMASM
 MSAMXMSMSA
@@ -187,7 +187,7 @@ SAXAMASAAA
 MAMMMXMMMM
 MXMXAXMASX";
 
-        let result = get_all_xmas(input).unwrap();
+        let result = find_all_xmas_substrings(input).unwrap();
 
         assert_eq!(result.horizontal_left_to_right_search_count, 3);
         assert_eq!(result.horizontal_right_to_left_search_count, 2);
