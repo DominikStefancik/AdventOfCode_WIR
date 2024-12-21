@@ -10,4 +10,3 @@ impl From<io::Error> for AdventOfCodeError {
         AdventOfCodeError::IoError(err)
     }
 }
-

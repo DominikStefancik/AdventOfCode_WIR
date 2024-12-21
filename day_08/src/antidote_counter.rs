@@ -10,7 +10,7 @@ enum AntidoteDirection {
     FromAntenna2,
 }
 
-fn create_antennas_map(map: &Vec<Vec<char>>) -> HashMap<char, Vec<Antenna>> {
+pub fn create_antennas_map(map: &Vec<Vec<char>>) -> HashMap<char, Vec<Antenna>> {
     let mut antennas_map: HashMap<char, Vec<Antenna>> = HashMap::new();
 
     for (row_index, row) in map.iter().enumerate() {
@@ -46,13 +46,12 @@ fn create_antenna_pairs(antennas: &Vec<Antenna>) -> Vec<(&Antenna, &Antenna)> {
 }
 
 fn get_antidote_position(
-    territory_dimension: (usize, usize),
     pair: (&Antenna, &Antenna),
     direction: AntidoteDirection,
-) -> Option<(isize, isize)> {
+    row_difference: isize,
+    column_difference: isize,
+) -> (isize, isize) {
     let (antenna1, antenna2) = pair;
-    let row_difference = antenna1.row_index.abs_diff(antenna2.row_index) as isize;
-    let column_difference = antenna1.column_index.abs_diff(antenna2.column_index) as isize;
     let antidote_x;
     let antidote_y;
 
@@ -75,19 +74,37 @@ fn get_antidote_position(
         }
     }
 
+    (antidote_x, antidote_y)
+}
+
+fn is_antidote_in_map(antidote: (isize, isize), territory_dimension: (usize, usize)) -> bool {
+    let (antidote_x, antidote_y) = antidote;
     let is_antidote_x_in_map = antidote_x >= 0 && antidote_x < territory_dimension.0 as isize;
     let is_antidote_y_in_map = antidote_y >= 0 && antidote_y < territory_dimension.1 as isize;
 
-    if is_antidote_x_in_map && is_antidote_y_in_map {
-        return Some((antidote_x, antidote_y));
+    is_antidote_x_in_map && is_antidote_y_in_map
+}
+
+fn get_antidote(
+    territory_dimension: (usize, usize),
+    pair: (&Antenna, &Antenna),
+    direction: AntidoteDirection,
+    row_difference: isize,
+    column_difference: isize,
+) -> Option<(isize, isize)> {
+    let antidote = get_antidote_position(pair, direction, row_difference, column_difference);
+
+    if is_antidote_in_map(antidote, territory_dimension) {
+        return Some(antidote);
     }
 
     None
 }
 
-pub fn calculate_antidotes_count(territory_map: &Vec<Vec<char>>) -> usize {
-    let territory_dimension = (territory_map.len(), territory_map[0].len());
-    let antennas_map = create_antennas_map(territory_map);
+pub fn calculate_antidotes_count(
+    antennas_map: &HashMap<char, Vec<Antenna>>,
+    territory_dimension: (usize, usize),
+) -> usize {
     let mut unique_antidotes = HashSet::new();
 
     for key in antennas_map.keys() {
@@ -95,16 +112,78 @@ pub fn calculate_antidotes_count(territory_map: &Vec<Vec<char>>) -> usize {
         let antenna_pairs = create_antenna_pairs(antennas);
 
         for pair in antenna_pairs {
-            let antidote_position =
-                get_antidote_position(territory_dimension, pair, AntidoteDirection::FromAntenna1);
-            if antidote_position.is_some() {
-                unique_antidotes.insert(antidote_position.unwrap());
+            let (antenna1, antenna2) = pair;
+            let row_difference = antenna1.row_index.abs_diff(antenna2.row_index) as isize;
+            let column_difference = antenna1.column_index.abs_diff(antenna2.column_index) as isize;
+
+            if let Some(antidote) = get_antidote(
+                territory_dimension,
+                pair,
+                AntidoteDirection::FromAntenna1,
+                row_difference,
+                column_difference,
+            ) {
+                unique_antidotes.insert(antidote);
             }
 
-            let antidote_position =
-                get_antidote_position(territory_dimension, pair, AntidoteDirection::FromAntenna2);
-            if antidote_position.is_some() {
-                unique_antidotes.insert(antidote_position.unwrap());
+            if let Some(antidote) = get_antidote(
+                territory_dimension,
+                pair,
+                AntidoteDirection::FromAntenna2,
+                row_difference,
+                column_difference,
+            ) {
+                unique_antidotes.insert(antidote);
+            }
+        }
+    }
+
+    unique_antidotes.len()
+}
+
+pub fn calculate_antidotes_at_any_grid_count(
+    antennas_map: &HashMap<char, Vec<Antenna>>,
+    territory_dimension: (usize, usize),
+) -> usize {
+    let mut unique_antidotes = HashSet::new();
+
+    for key in antennas_map.keys() {
+        let antennas = antennas_map.get(key).unwrap();
+        let antenna_pairs = create_antenna_pairs(antennas);
+
+        for pair in antenna_pairs {
+            let (antenna1, antenna2) = pair;
+            let row_difference = antenna1.row_index.abs_diff(antenna2.row_index) as isize;
+            let column_difference = antenna1.column_index.abs_diff(antenna2.column_index) as isize;
+
+            // In the "at any grid" case, all antennas are also antidotes
+            unique_antidotes.insert((antenna1.row_index as isize, antenna1.column_index as isize));
+            unique_antidotes.insert((antenna2.row_index as isize, antenna2.column_index as isize));
+
+            let mut multiplier = 1_isize;
+            // continue increasing the row_difference and column_difference until a possible
+            // position of an antidote is outside the map boundaries
+            while let Some(antidote) = get_antidote(
+                territory_dimension,
+                pair,
+                AntidoteDirection::FromAntenna1,
+                row_difference * multiplier,
+                column_difference * multiplier,
+            ) {
+                unique_antidotes.insert(antidote);
+                multiplier += 1;
+            }
+
+            multiplier = 1;
+            while let Some(antidote) = get_antidote(
+                territory_dimension,
+                pair,
+                AntidoteDirection::FromAntenna2,
+                row_difference * multiplier,
+                column_difference * multiplier,
+            ) {
+                unique_antidotes.insert(antidote);
+                multiplier += 1;
             }
         }
     }
@@ -116,7 +195,8 @@ pub fn calculate_antidotes_count(territory_map: &Vec<Vec<char>>) -> usize {
 mod tests {
     use crate::antenna::Antenna;
     use crate::antidote_counter::{
-        calculate_antidotes_count, create_antenna_pairs, create_antennas_map,
+        calculate_antidotes_at_any_grid_count, calculate_antidotes_count, create_antenna_pairs,
+        create_antennas_map,
     };
     use crate::parser::parse_input;
 
@@ -319,8 +399,20 @@ mod tests {
     #[test]
     fn gets_correct_antidotes_count() {
         let mut map = parse_input(INPUT);
-        let result = calculate_antidotes_count(&mut map);
+        let map_dimensions = (map.len(), map[0].len());
+        let antennas_map = create_antennas_map(&mut map);
+        let result = calculate_antidotes_count(&antennas_map, map_dimensions);
 
         assert_eq!(result, 14);
+    }
+
+    #[test]
+    fn gets_correct_antidotes_at_any_grid_count() {
+        let mut map = parse_input(INPUT);
+        let map_dimensions = (map.len(), map[0].len());
+        let antennas_map = create_antennas_map(&mut map);
+        let result = calculate_antidotes_at_any_grid_count(&antennas_map, map_dimensions);
+
+        assert_eq!(result, 34);
     }
 }
